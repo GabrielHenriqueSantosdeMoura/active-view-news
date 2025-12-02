@@ -45,3 +45,19 @@ export const DEFAULT_TOPICS = [
 
 // Admin API key
 export const ADMIN_API_KEY = 'admin_api_key';
+
+// Collection type for saved articles
+export interface Collection {
+  id: string;
+  name: string;
+  articles: NewsArticle[];
+  createdAt: string;
+}
+
+// Storage keys
+export const STORAGE_KEYS = {
+  PREFERENCES: 'activeview_news_preferences',
+  COLLECTIONS: 'activeview_news_collections',
+  USER_ID: 'activeview_user_id',
+  ADMIN_KEY: 'activeview_admin_key',
+} as const;
