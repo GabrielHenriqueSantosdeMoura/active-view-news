@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import { UserPreferences, DEFAULT_TOPICS } from '../lib/types';
 import { validateApiKey } from '../lib/api';
+import { setCurrentUserId } from '../lib/supabase';
+import { createOrLoginUser, updatePreferredTopics, getUserData } from '../lib/database.service';
 import { KeyIcon, SparklesIcon, ArrowRightIcon, CheckIcon, LoaderIcon } from './Icons';
 
 interface OnboardingProps {
@@ -36,26 +38,82 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
     const isValid = await validateApiKey(apiKey.trim());
 
-    setIsValidating(false);
+    if (!isValid) {
+      setError('Invalid API key. Please check and try again.');
+      setIsValidating(false);
+      return;
+    }
 
-    if (isValid) {
+    // Try to create or login user
+    const { userId, isNewUser } = await createOrLoginUser(apiKey.trim());
+
+    if (!userId) {
+      setError('Failed to connect. Please try again.');
+      setIsValidating(false);
+      return;
+    }
+
+    // Save user ID locally
+    setCurrentUserId(userId);
+
+    if (isNewUser) {
+      // New user - go to topics selection
+      setIsValidating(false);
       setStep(2);
     } else {
-      setError('Invalid API key. Please check and try again.');
+      // Existing user - get their data and complete login
+      const userData = await getUserData(userId);
+      
+      if (userData && userData.preferredTopics.length > 0) {
+        // User has topics, complete login immediately
+        onComplete({
+          apiKey: apiKey.trim(),
+          favoriteTopics: userData.preferredTopics,
+          onboardingComplete: true,
+        });
+      } else {
+        // User exists but no topics, show topics step
+        setIsValidating(false);
+        setStep(2);
+      }
     }
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     if (selectedTopics.length === 0) {
       setError('Please select at least one topic');
       return;
     }
 
-    onComplete({
-      apiKey: apiKey.trim(),
-      favoriteTopics: selectedTopics,
-      onboardingComplete: true,
-    });
+    setIsValidating(true);
+    setError('');
+
+    try {
+      // Get the user ID we saved earlier
+      const storedUserId = localStorage.getItem('activeview_user_id');
+      
+      if (!storedUserId) {
+        setError('Session expired. Please try again.');
+        setStep(1);
+        setIsValidating(false);
+        return;
+      }
+
+      // Update preferred topics
+      await updatePreferredTopics(storedUserId, selectedTopics);
+
+      // Complete onboarding
+      onComplete({
+        apiKey: apiKey.trim(),
+        favoriteTopics: selectedTopics,
+        onboardingComplete: true,
+      });
+    } catch (err) {
+      console.error('Onboarding error:', err);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setIsValidating(false);
+    }
   };
 
   return (
@@ -135,7 +193,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                   {isValidating ? (
                     <>
                       <LoaderIcon size={20} />
-                      Validating...
+                      Connecting...
                     </>
                   ) : (
                     <>
@@ -209,10 +267,20 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                   </button>
                   <button
                     onClick={handleComplete}
-                    className="btn-primary flex-1 flex items-center justify-center gap-2"
+                    disabled={isValidating}
+                    className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Get Started
-                    <ArrowRightIcon size={20} />
+                    {isValidating ? (
+                      <>
+                        <LoaderIcon size={20} />
+                        Setting up...
+                      </>
+                    ) : (
+                      <>
+                        Get Started
+                        <ArrowRightIcon size={20} />
+                      </>
+                    )}
                   </button>
                 </div>
 
@@ -240,4 +308,3 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     </div>
   );
 }
-

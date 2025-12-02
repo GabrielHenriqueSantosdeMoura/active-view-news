@@ -2,24 +2,26 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { NewsArticle, Collection } from '../lib/types';
+import { NewsArticle } from '../lib/types';
 import { formatDate } from '../lib/api';
 import { BookmarkIcon, ExternalLinkIcon, PlusIcon, FolderIcon, CheckIcon } from './Icons';
 
 interface ArticleCardProps {
   article: NewsArticle;
-  collections: Collection[];
-  onAddToCollection: (article: NewsArticle, collectionId: string) => void;
+  collectionNames: string[];
+  onSaveToCollection: (article: NewsArticle, collectionName: string) => void;
   onCreateCollection: (name: string, article: NewsArticle) => void;
   isInCollection: (articleUrl: string) => boolean;
+  onArticleClick?: (articleUrl: string) => void;
 }
 
 export default function ArticleCard({
   article,
-  collections,
-  onAddToCollection,
+  collectionNames,
+  onSaveToCollection,
   onCreateCollection,
   isInCollection,
+  onArticleClick,
 }: ArticleCardProps) {
   const [showCollectionMenu, setShowCollectionMenu] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
@@ -31,6 +33,12 @@ export default function ArticleCard({
       setNewCollectionName('');
       setIsCreatingCollection(false);
       setShowCollectionMenu(false);
+    }
+  };
+
+  const handleArticleLinkClick = () => {
+    if (onArticleClick) {
+      onArticleClick(article.url);
     }
   };
 
@@ -97,41 +105,26 @@ export default function ArticleCard({
                 </div>
                 
                 <div className="max-h-48 overflow-y-auto">
-                  {collections.length === 0 && !isCreatingCollection ? (
+                  {collectionNames.length === 0 && !isCreatingCollection ? (
                     <p className="p-4 text-sm text-[var(--text-muted)] text-center">
                       No collections yet
                     </p>
                   ) : (
-                    collections.map((collection) => {
-                      const isInThisCollection = collection.articles.some(
-                        (a) => a.url === article.url
-                      );
-                      return (
-                        <button
-                          key={collection.id}
-                          onClick={() => {
-                            if (!isInThisCollection) {
-                              onAddToCollection(article, collection.id);
-                            }
-                            setShowCollectionMenu(false);
-                          }}
-                          disabled={isInThisCollection}
-                          className={`w-full flex items-center gap-3 p-3 text-left transition-colors ${
-                            isInThisCollection
-                              ? 'bg-[var(--surface)] cursor-default'
-                              : 'hover:bg-[var(--surface-hover)]'
-                          }`}
-                        >
-                          <FolderIcon size={18} className="text-[var(--primary)] flex-shrink-0" />
-                          <span className="text-sm text-[var(--foreground)] flex-1 truncate">
-                            {collection.name}
-                          </span>
-                          {isInThisCollection && (
-                            <CheckIcon size={16} className="text-[var(--primary)]" />
-                          )}
-                        </button>
-                      );
-                    })
+                    collectionNames.map((name) => (
+                      <button
+                        key={name}
+                        onClick={() => {
+                          onSaveToCollection(article, name);
+                          setShowCollectionMenu(false);
+                        }}
+                        className="w-full flex items-center gap-3 p-3 text-left transition-colors hover:bg-[var(--surface-hover)]"
+                      >
+                        <FolderIcon size={18} className="text-[var(--primary)] flex-shrink-0" />
+                        <span className="text-sm text-[var(--foreground)] flex-1 truncate">
+                          {name}
+                        </span>
+                      </button>
+                    ))
                   )}
                 </div>
 
@@ -190,6 +183,7 @@ export default function ArticleCard({
             target="_blank"
             rel="noopener noreferrer"
             className="hover:underline"
+            onClick={handleArticleLinkClick}
           >
             {article.title}
           </a>
@@ -211,6 +205,7 @@ export default function ArticleCard({
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 text-[var(--primary)] hover:underline font-medium"
+            onClick={handleArticleLinkClick}
           >
             Read more
             <ExternalLinkIcon size={14} />
@@ -220,4 +215,3 @@ export default function ArticleCard({
     </article>
   );
 }
-

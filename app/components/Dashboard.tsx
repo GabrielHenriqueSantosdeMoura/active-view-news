@@ -2,14 +2,26 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { UserPreferences, Collection, NewsArticle } from '../lib/types';
+import { UserPreferences, NewsArticle } from '../lib/types';
+import { CollectionData } from '../lib/database.types';
 import { searchNews } from '../lib/api';
-import { getCollections, saveCollections, generateId, clearAllData } from '../lib/storage';
+import { getCurrentUserId, clearAuthData } from '../lib/supabase';
+import {
+  getCollections,
+  saveArticle,
+  removeArticle,
+  removeCollection,
+  trackArticleSeen,
+  getArticlesSeenStats,
+  getCollectionNames,
+  isArticleInCollections,
+  getTotalArticleCount,
+} from '../lib/database.service';
 import SearchBar from './SearchBar';
 import ArticleCard from './ArticleCard';
 import { ArticleSkeletonGrid } from './ArticleSkeleton';
 import CollectionsPanel from './CollectionsPanel';
-import { BookmarkIcon, SettingsIcon, NewspaperIcon } from './Icons';
+import { BookmarkIcon, SettingsIcon, NewspaperIcon, TrendingUpIcon } from './Icons';
 
 interface DashboardProps {
   preferences: UserPreferences;
@@ -18,18 +30,42 @@ interface DashboardProps {
 
 export default function Dashboard({ preferences, onLogout }: DashboardProps) {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
-  const [collections, setCollections] = useState<Collection[]>([]);
+  const [collections, setCollections] = useState<CollectionData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingCollections, setIsLoadingCollections] = useState(true);
   const [error, setError] = useState('');
   const [currentQuery, setCurrentQuery] = useState('');
   const [showCollections, setShowCollections] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [totalResults, setTotalResults] = useState(0);
+  const [stats, setStats] = useState({ seen: 0, clicks: 0 });
 
-  // Load collections on mount
+  const userId = getCurrentUserId();
+
+  // Load collections and stats from database
+  const loadCollectionsFromDB = useCallback(async () => {
+    if (!userId) return;
+    
+    setIsLoadingCollections(true);
+    try {
+      const [collectionsData, statsData] = await Promise.all([
+        getCollections(userId),
+        getArticlesSeenStats(userId),
+      ]);
+      
+      setCollections(collectionsData);
+      setStats(statsData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setIsLoadingCollections(false);
+    }
+  }, [userId]);
+
+  // Load data on mount
   useEffect(() => {
-    setCollections(getCollections());
-  }, []);
+    loadCollectionsFromDB();
+  }, [loadCollectionsFromDB]);
 
   // Load initial news based on first favorite topic
   useEffect(() => {
@@ -60,73 +96,70 @@ export default function Dashboard({ preferences, onLogout }: DashboardProps) {
     }
   }, [preferences.apiKey]);
 
-  // Collection management
-  const handleCreateCollection = (name: string, article?: NewsArticle) => {
-    const newCollection: Collection = {
-      id: generateId(),
-      name,
-      articles: article ? [article] : [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    const updated = [...collections, newCollection];
-    setCollections(updated);
-    saveCollections(updated);
+  // Article click tracking
+  const handleArticleClick = async (articleUrl: string) => {
+    if (!userId) return;
+    
+    await trackArticleSeen(userId, articleUrl);
+    // Refresh stats from DB
+    const statsData = await getArticlesSeenStats(userId);
+    setStats(statsData);
   };
 
-  const handleDeleteCollection = (id: string) => {
-    const updated = collections.filter((c) => c.id !== id);
-    setCollections(updated);
-    saveCollections(updated);
+  // Save article to collection
+  const handleSaveToCollection = async (article: NewsArticle, collectionName: string) => {
+    if (!userId) return;
+    
+    const success = await saveArticle(userId, article, collectionName);
+    
+    if (success) {
+      // Refresh collections from DB
+      await loadCollectionsFromDB();
+    }
   };
 
-  const handleAddToCollection = (article: NewsArticle, collectionId: string) => {
-    const updated = collections.map((c) => {
-      if (c.id === collectionId) {
-        // Check if article already exists
-        if (c.articles.some((a) => a.url === article.url)) {
-          return c;
-        }
-        return {
-          ...c,
-          articles: [...c.articles, article],
-          updatedAt: new Date().toISOString(),
-        };
-      }
-      return c;
-    });
-
-    setCollections(updated);
-    saveCollections(updated);
+  // Create new collection with article
+  const handleCreateCollection = async (name: string, article?: NewsArticle) => {
+    if (!userId || !article) return;
+    await handleSaveToCollection(article, name);
   };
 
-  const handleRemoveFromCollection = (collectionId: string, articleUrl: string) => {
-    const updated = collections.map((c) => {
-      if (c.id === collectionId) {
-        return {
-          ...c,
-          articles: c.articles.filter((a) => a.url !== articleUrl),
-          updatedAt: new Date().toISOString(),
-        };
-      }
-      return c;
-    });
-
-    setCollections(updated);
-    saveCollections(updated);
+  // Remove article from collection
+  const handleRemoveFromCollection = async (collectionName: string, articleUrl: string) => {
+    if (!userId) return;
+    
+    const success = await removeArticle(userId, articleUrl, collectionName);
+    
+    if (success) {
+      // Refresh collections from DB
+      await loadCollectionsFromDB();
+    }
   };
 
-  const isArticleInAnyCollection = (articleUrl: string) => {
-    return collections.some((c) => c.articles.some((a) => a.url === articleUrl));
+  // Delete collection
+  const handleDeleteCollection = async (collectionName: string) => {
+    if (!userId) return;
+    
+    const success = await removeCollection(userId, collectionName);
+    
+    if (success) {
+      // Refresh collections from DB
+      await loadCollectionsFromDB();
+    }
+  };
+
+  // Check if article is saved
+  const isArticleSaved = (articleUrl: string) => {
+    return isArticleInCollections(collections, articleUrl);
   };
 
   const handleLogout = () => {
-    clearAllData();
+    clearAuthData();
     onLogout();
   };
 
-  const totalSavedArticles = collections.reduce((sum, c) => sum + c.articles.length, 0);
+  const collectionNames = getCollectionNames(collections);
+  const totalSavedArticles = getTotalArticleCount(collections);
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -181,6 +214,12 @@ export default function Dashboard({ preferences, onLogout }: DashboardProps) {
                       <p className="text-sm text-[var(--text-muted)]">API Key</p>
                       <p className="font-mono text-sm text-[var(--foreground)] truncate">
                         {preferences.apiKey.slice(0, 8)}...{preferences.apiKey.slice(-4)}
+                      </p>
+                    </div>
+                    <div className="p-4 border-b border-[var(--border)]">
+                      <p className="text-sm text-[var(--text-muted)]">User ID</p>
+                      <p className="font-mono text-xs text-[var(--foreground)] truncate">
+                        {userId || 'Not connected'}
                       </p>
                     </div>
                     <div className="p-2">
@@ -277,10 +316,11 @@ export default function Dashboard({ preferences, onLogout }: DashboardProps) {
                 >
                   <ArticleCard
                     article={article}
-                    collections={collections}
-                    onAddToCollection={handleAddToCollection}
+                    collectionNames={collectionNames}
+                    onSaveToCollection={handleSaveToCollection}
                     onCreateCollection={handleCreateCollection}
-                    isInCollection={isArticleInAnyCollection}
+                    isInCollection={isArticleSaved}
+                    onArticleClick={handleArticleClick}
                   />
                 </div>
               ))}
@@ -321,11 +361,10 @@ export default function Dashboard({ preferences, onLogout }: DashboardProps) {
         collections={collections}
         isOpen={showCollections}
         onClose={() => setShowCollections(false)}
-        onCreateCollection={(name) => handleCreateCollection(name)}
         onDeleteCollection={handleDeleteCollection}
         onRemoveFromCollection={handleRemoveFromCollection}
+        isLoading={isLoadingCollections}
       />
     </div>
   );
 }
-
