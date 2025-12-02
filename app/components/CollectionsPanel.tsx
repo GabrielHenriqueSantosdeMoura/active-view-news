@@ -73,7 +73,7 @@ export default function CollectionsPanel({
               <BookmarkIcon size={24} className="text-[var(--primary)]" />
               My Collections
               <span className="text-sm font-normal text-[var(--text-muted)]">
-                ({totalArticles} articles)
+                ({collections.length} collections)
               </span>
             </h2>
           )}

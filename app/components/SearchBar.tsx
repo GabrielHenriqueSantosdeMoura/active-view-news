@@ -9,31 +9,77 @@ interface SearchBarProps {
   currentQuery: string;
 }
 
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
 export default function SearchBar({ onSearch, favoriteTopics, currentQuery }: SearchBarProps) {
   const [query, setQuery] = useState(currentQuery);
   const [isFocused, setIsFocused] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastSearchRef = useRef<string>('');
 
+  // Debounce the query - waits 300ms after user stops typing
+  const debouncedQuery = useDebounce(query, 300);
+
+  // Update local query when currentQuery prop changes (from topic buttons)
   useEffect(() => {
-    setQuery(currentQuery);
-  }, [currentQuery]);
+    if (!isTyping) {
+      setQuery(currentQuery);
+    }
+  }, [currentQuery, isTyping]);
+
+  // Trigger search when debounced query changes (only when typing)
+  useEffect(() => {
+    if (isTyping && debouncedQuery.trim() && debouncedQuery !== lastSearchRef.current) {
+      lastSearchRef.current = debouncedQuery;
+      onSearch(debouncedQuery.trim());
+      setIsTyping(false);
+    }
+  }, [debouncedQuery, onSearch, isTyping]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
+      lastSearchRef.current = query.trim();
       onSearch(query.trim());
+      setIsTyping(false);
       inputRef.current?.blur();
     }
   };
 
   const handleTopicClick = (topic: string) => {
+    // Always trigger search when clicking a topic, even if it's the same
     setQuery(topic);
+    setIsTyping(false);
+    lastSearchRef.current = topic;
     onSearch(topic);
   };
 
   const clearQuery = () => {
     setQuery('');
+    setIsTyping(false);
+    lastSearchRef.current = '';
     inputRef.current?.focus();
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setQuery(e.target.value);
+    setIsTyping(true);
   };
 
   return (
@@ -55,27 +101,21 @@ export default function SearchBar({ onSearch, favoriteTopics, currentQuery }: Se
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={handleInputChange}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             placeholder="Search for news topics..."
-            className="w-full py-4 pl-12 pr-24 bg-white border-2 border-[var(--border)] rounded-2xl text-[var(--foreground)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)] transition-colors text-lg"
+            className="w-full py-4 pl-12 pr-12 bg-white border-2 border-[var(--border)] rounded-2xl text-[var(--foreground)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)] transition-colors text-lg"
           />
           {query && (
             <button
               type="button"
               onClick={clearQuery}
-              className="absolute right-20 p-1 text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors"
+              className="absolute right-4 p-1 text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors"
             >
+              <XIcon size={18} />
             </button>
           )}
-          <button
-            type="submit"
-            disabled={!query.trim()}
-            className="absolute right-2 px-4 py-2 bg-[var(--primary)] text-white rounded-xl font-medium hover:bg-[var(--primary-dark)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Search
-          </button>
         </div>
       </form>
 
@@ -89,11 +129,12 @@ export default function SearchBar({ onSearch, favoriteTopics, currentQuery }: Se
           {favoriteTopics.map((topic) => (
             <button
               key={topic}
+              type="button"
               onClick={() => handleTopicClick(topic)}
               className={`tag cursor-pointer transition-all ${
                 currentQuery.toLowerCase() === topic.toLowerCase()
                   ? 'tag-active'
-                  : ''
+                  : 'hover:border-[var(--primary)]'
               }`}
             >
               {topic}

@@ -129,7 +129,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         <div className="flex items-center gap-3">
           <Image
             src="/logo.png"
-            alt="ActiveView News"
+            alt="InActiveView News"
             width={140}
             height={35}
             className="h-10 w-auto"
@@ -155,7 +155,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                   <KeyIcon className="text-white" size={28} />
                 </div>
                 <h1 className="text-3xl font-bold text-[var(--foreground)] mb-3">
-                  Welcome to ActiveView News
+                  Welcome to InActiveView News
                 </h1>
                 <p className="text-[var(--text-muted)] text-lg">
                   Enter your News API key to get started

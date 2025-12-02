@@ -16,19 +16,22 @@ import {
   getCollectionNames,
   isArticleInCollections,
   getTotalArticleCount,
+  updatePreferredTopics,
 } from '../lib/database.service';
 import SearchBar from './SearchBar';
 import ArticleCard from './ArticleCard';
 import { ArticleSkeletonGrid } from './ArticleSkeleton';
 import CollectionsPanel from './CollectionsPanel';
-import { BookmarkIcon, SettingsIcon, NewspaperIcon, TrendingUpIcon } from './Icons';
+import TopicsManager from './TopicsManager';
+import { BookmarkIcon, SettingsIcon, NewspaperIcon, SparklesIcon } from './Icons';
 
 interface DashboardProps {
   preferences: UserPreferences;
   onLogout: () => void;
+  onUpdatePreferences: (preferences: UserPreferences) => void;
 }
 
-export default function Dashboard({ preferences, onLogout }: DashboardProps) {
+export default function Dashboard({ preferences, onLogout, onUpdatePreferences }: DashboardProps) {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [collections, setCollections] = useState<CollectionData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -37,6 +40,7 @@ export default function Dashboard({ preferences, onLogout }: DashboardProps) {
   const [currentQuery, setCurrentQuery] = useState('');
   const [showCollections, setShowCollections] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showTopicsManager, setShowTopicsManager] = useState(false);
   const [totalResults, setTotalResults] = useState(0);
   const [stats, setStats] = useState({ seen: 0, clicks: 0 });
 
@@ -148,6 +152,21 @@ export default function Dashboard({ preferences, onLogout }: DashboardProps) {
     }
   };
 
+  // Update preferred topics
+  const handleUpdateTopics = async (newTopics: string[]) => {
+    if (!userId) return;
+    
+    const success = await updatePreferredTopics(userId, newTopics);
+    
+    if (success) {
+      // Update local preferences
+      onUpdatePreferences({
+        ...preferences,
+        favoriteTopics: newTopics,
+      });
+    }
+  };
+
   // Check if article is saved
   const isArticleSaved = (articleUrl: string) => {
     return isArticleInCollections(collections, articleUrl);
@@ -180,6 +199,18 @@ export default function Dashboard({ preferences, onLogout }: DashboardProps) {
 
             {/* Actions */}
             <div className="flex items-center gap-2">
+              {/* Topics button */}
+              <button
+                onClick={() => setShowTopicsManager(true)}
+                className="relative flex items-center gap-2 px-4 py-2 text-[var(--text-secondary)] hover:text-[var(--primary)] hover:bg-[var(--surface)] rounded-xl transition-colors"
+              >
+                <SparklesIcon size={20} />
+                <span className="hidden sm:inline font-medium">Topics</span>
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-[var(--primary)] text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  {preferences.favoriteTopics.length}
+                </span>
+              </button>
+
               {/* Collections button */}
               <button
                 onClick={() => setShowCollections(true)}
@@ -340,7 +371,7 @@ export default function Dashboard({ preferences, onLogout }: DashboardProps) {
               rel="noopener noreferrer"
               className="text-[var(--primary)] hover:underline font-medium"
             >
-              ActiveView
+              InActiveView
             </a>
             {' '}•{' '}
             News data from{' '}
@@ -364,6 +395,14 @@ export default function Dashboard({ preferences, onLogout }: DashboardProps) {
         onDeleteCollection={handleDeleteCollection}
         onRemoveFromCollection={handleRemoveFromCollection}
         isLoading={isLoadingCollections}
+      />
+
+      {/* Topics manager */}
+      <TopicsManager
+        topics={preferences.favoriteTopics}
+        onUpdateTopics={handleUpdateTopics}
+        isOpen={showTopicsManager}
+        onClose={() => setShowTopicsManager(false)}
       />
     </div>
   );

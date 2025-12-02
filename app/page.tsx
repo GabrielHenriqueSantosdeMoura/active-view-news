@@ -47,6 +47,10 @@ export default function Home() {
     setPreferences(null);
   };
 
+  const handleUpdatePreferences = (newPreferences: UserPreferences) => {
+    setPreferences(newPreferences);
+  };
+
   // Show loading state
   if (isLoading) {
     return (
@@ -65,5 +69,11 @@ export default function Home() {
   }
 
   // Show dashboard
-  return <Dashboard preferences={preferences} onLogout={handleLogout} />;
+  return (
+    <Dashboard
+      preferences={preferences}
+      onLogout={handleLogout}
+      onUpdatePreferences={handleUpdatePreferences}
+    />
+  );
 }
