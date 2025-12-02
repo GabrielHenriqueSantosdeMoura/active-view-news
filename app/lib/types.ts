@@ -26,22 +26,7 @@ export interface UserPreferences {
   apiKey: string;
   favoriteTopics: string[];
   onboardingComplete: boolean;
-}
-
-// Collections
-export interface Collection {
-  id: string;
-  name: string;
-  description?: string;
-  articles: NewsArticle[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-// App State
-export interface AppState {
-  preferences: UserPreferences;
-  collections: Collection[];
+  isAdmin?: boolean;
 }
 
 // Default topics
@@ -58,9 +43,5 @@ export const DEFAULT_TOPICS = [
   'Politics',
 ];
 
-// Storage keys
-export const STORAGE_KEYS = {
-  PREFERENCES: 'activeview_news_preferences',
-  COLLECTIONS: 'activeview_news_collections',
-} as const;
-
+// Admin API key
+export const ADMIN_API_KEY = 'admin_api_key';

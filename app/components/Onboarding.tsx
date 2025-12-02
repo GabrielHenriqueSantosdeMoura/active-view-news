@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { UserPreferences, DEFAULT_TOPICS } from '../lib/types';
+import { UserPreferences, DEFAULT_TOPICS, ADMIN_API_KEY } from '../lib/types';
 import { validateApiKey } from '../lib/api';
 import { setCurrentUserId } from '../lib/supabase';
 import { createOrLoginUser, updatePreferredTopics, getUserData } from '../lib/database.service';
@@ -36,6 +36,19 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     setIsValidating(true);
     setError('');
 
+    // Check if admin
+    if (apiKey.trim() === ADMIN_API_KEY) {
+      // Admin login - complete immediately
+      onComplete({
+        apiKey: apiKey.trim(),
+        favoriteTopics: [],
+        onboardingComplete: true,
+        isAdmin: true,
+      });
+      return;
+    }
+
+    // Regular user flow
     const isValid = await validateApiKey(apiKey.trim());
 
     if (!isValid) {
@@ -70,6 +83,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           apiKey: apiKey.trim(),
           favoriteTopics: userData.preferredTopics,
           onboardingComplete: true,
+          isAdmin: false,
         });
       } else {
         // User exists but no topics, show topics step
@@ -107,6 +121,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         apiKey: apiKey.trim(),
         favoriteTopics: selectedTopics,
         onboardingComplete: true,
+        isAdmin: false,
       });
     } catch (err) {
       console.error('Onboarding error:', err);
@@ -129,7 +144,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         <div className="flex items-center gap-3">
           <Image
             src="/logo.png"
-            alt="InActiveView News"
+            alt="ActiveView News"
             width={140}
             height={35}
             className="h-10 w-auto"
@@ -302,7 +317,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           rel="noopener noreferrer"
           className="text-[var(--primary)] hover:underline font-medium"
         >
-          ActiveView
+          InActiveView
         </a>
       </footer>
     </div>

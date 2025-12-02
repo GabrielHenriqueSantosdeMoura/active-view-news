@@ -1,11 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { UserPreferences } from './lib/types';
+import { UserPreferences, ADMIN_API_KEY } from './lib/types';
 import { getCurrentUserId, clearAuthData } from './lib/supabase';
 import { getUserData } from './lib/database.service';
 import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
+import AdminDashboard from './components/AdminDashboard';
+
+// Key for storing admin status in localStorage
+const ADMIN_KEY_STORAGE = 'activeview_admin_key';
 
 export default function Home() {
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
@@ -14,6 +18,19 @@ export default function Home() {
   // Load user data on mount
   useEffect(() => {
     const loadUserData = async () => {
+      // Check for admin first
+      const storedAdminKey = localStorage.getItem(ADMIN_KEY_STORAGE);
+      if (storedAdminKey === ADMIN_API_KEY) {
+        setPreferences({
+          apiKey: ADMIN_API_KEY,
+          favoriteTopics: [],
+          onboardingComplete: true,
+          isAdmin: true,
+        });
+        setIsLoading(false);
+        return;
+      }
+
       const userId = getCurrentUserId();
       
       if (userId) {
@@ -25,6 +42,7 @@ export default function Home() {
               apiKey: userData.newsApiKey,
               favoriteTopics: userData.preferredTopics,
               onboardingComplete: true,
+              isAdmin: false,
             });
           }
         } catch (error) {
@@ -39,11 +57,16 @@ export default function Home() {
   }, []);
 
   const handleOnboardingComplete = (newPreferences: UserPreferences) => {
+    // If admin, store the admin key
+    if (newPreferences.isAdmin) {
+      localStorage.setItem(ADMIN_KEY_STORAGE, newPreferences.apiKey);
+    }
     setPreferences(newPreferences);
   };
 
   const handleLogout = () => {
     clearAuthData();
+    localStorage.removeItem(ADMIN_KEY_STORAGE);
     setPreferences(null);
   };
 
@@ -68,7 +91,12 @@ export default function Home() {
     return <Onboarding onComplete={handleOnboardingComplete} />;
   }
 
-  // Show dashboard
+  // Show admin dashboard if admin
+  if (preferences.isAdmin) {
+    return <AdminDashboard apiKey={preferences.apiKey} onLogout={handleLogout} />;
+  }
+
+  // Show regular dashboard
   return (
     <Dashboard
       preferences={preferences}
