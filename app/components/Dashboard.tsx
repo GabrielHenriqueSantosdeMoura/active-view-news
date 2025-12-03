@@ -77,13 +77,19 @@ export default function Dashboard({ preferences, onLogout, onUpdatePreferences }
       return;
     }
 
+    // If empty query, use favorite topics or default to "news"
+    const searchQuery = query.trim() || 
+      (preferences.favoriteTopics.length > 0 
+        ? preferences.favoriteTopics.join(' OR ') 
+        : 'news');
+
     setCurrentQuery(query);
     setIsLoading(true);
     setError('');
 
     try {
       const response = await searchNews({
-        query,
+        query: searchQuery,
         userId,
         pageSize: 21,
       });
@@ -96,15 +102,15 @@ export default function Dashboard({ preferences, onLogout, onUpdatePreferences }
     } finally {
       setIsLoading(false);
     }
-  }, [userId]);
+  }, [userId, preferences.favoriteTopics]);
 
-  // Load initial news based on first favorite topic
+  // Load initial news on mount
   useEffect(() => {
-    if (preferences.favoriteTopics.length > 0 && !currentQuery && userId) {
-      handleSearch(preferences.favoriteTopics[0]);
+    if (userId && articles.length === 0 && !isLoading) {
+      handleSearch('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preferences.favoriteTopics, userId]);
+  }, [userId]);
 
   // Article click tracking
   const handleArticleClick = async (articleUrl: string) => {
@@ -294,19 +300,21 @@ export default function Dashboard({ preferences, onLogout, onUpdatePreferences }
 
         {/* Results section */}
         <section>
-          {currentQuery && (
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-[var(--foreground)] flex items-center gap-2">
-                <NewspaperIcon size={24} className="text-[var(--primary)]" />
-                Results for &ldquo;{currentQuery}&rdquo;
-                {!isLoading && totalResults > 0 && (
-                  <span className="text-[var(--text-muted)] font-normal text-base">
-                    ({totalResults.toLocaleString()} articles)
-                  </span>
-                )}
-              </h2>
-            </div>
-          )}
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-[var(--foreground)] flex items-center gap-2">
+              <NewspaperIcon size={24} className="text-[var(--primary)]" />
+              {currentQuery ? (
+                <>Results for &ldquo;{currentQuery}&rdquo;</>
+              ) : (
+                <>Latest News</>
+              )}
+              {!isLoading && totalResults > 0 && (
+                <span className="text-[var(--text-muted)] font-normal text-base">
+                  ({totalResults.toLocaleString()} articles)
+                </span>
+              )}
+            </h2>
+          </div>
 
           {/* Error state */}
           {error && (
@@ -328,7 +336,7 @@ export default function Dashboard({ preferences, onLogout, onUpdatePreferences }
           {isLoading && <ArticleSkeletonGrid count={6} />}
 
           {/* Empty state */}
-          {!isLoading && !error && articles.length === 0 && currentQuery && (
+          {!isLoading && !error && articles.length === 0 && (
             <div className="text-center py-16 animate-fade-in">
               <div className="w-20 h-20 mx-auto mb-6 bg-[var(--surface)] rounded-2xl flex items-center justify-center">
                 <NewspaperIcon size={36} className="text-[var(--text-muted)]" />
@@ -337,7 +345,7 @@ export default function Dashboard({ preferences, onLogout, onUpdatePreferences }
                 No articles found
               </p>
               <p className="text-[var(--text-muted)]">
-                Try a different search term
+                {currentQuery ? 'Try a different search term' : 'Check back later for the latest news'}
               </p>
             </div>
           )}

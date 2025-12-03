@@ -76,6 +76,14 @@ export default function SearchBar({ onSearch, favoriteTopics, currentQuery }: Se
     setIsTyping(false);
     lastSearchRef.current = '';
     inputRef.current?.focus();
+    onSearch('');
+  };
+
+  const showAllArticles = () => {
+    setQuery('');
+    setIsTyping(false);
+    lastSearchRef.current = '';
+    onSearch(''); // Empty query shows all articles
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -121,28 +129,38 @@ export default function SearchBar({ onSearch, favoriteTopics, currentQuery }: Se
       </form>
 
       {/* Quick topics */}
-      {favoriteTopics.length > 0 && (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="flex items-center gap-1 text-sm text-[var(--text-muted)]">
-            <TrendingUpIcon size={14} />
-            Quick:
-          </span>
-          {favoriteTopics.map((topic) => (
-            <button
-              key={topic}
-              type="button"
-              onClick={() => handleTopicClick(topic)}
-              className={`tag cursor-pointer transition-all ${
-                currentQuery.toLowerCase() === topic.toLowerCase()
-                  ? 'tag-active'
-                  : 'hover:border-[var(--primary)]'
-              }`}
-            >
-              {topic}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <span className="flex items-center gap-1 text-sm text-[var(--text-muted)]">
+          <TrendingUpIcon size={14} />
+          Quick:
+        </span>
+        {/* All button */}
+        <button
+          type="button"
+          onClick={showAllArticles}
+          className={`tag cursor-pointer transition-all ${
+            !currentQuery
+              ? 'tag-active'
+              : 'hover:border-[var(--primary)]'
+          }`}
+        >
+          All
+        </button>
+        {favoriteTopics.map((topic) => (
+          <button
+            key={topic}
+            type="button"
+            onClick={() => handleTopicClick(topic)}
+            className={`tag cursor-pointer transition-all ${
+              currentQuery.toLowerCase() === topic.toLowerCase()
+                ? 'tag-active'
+                : 'hover:border-[var(--primary)]'
+            }`}
+          >
+            {topic}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
