@@ -71,14 +71,12 @@ export default function Dashboard({ preferences, onLogout, onUpdatePreferences }
     loadCollectionsFromDB();
   }, [loadCollectionsFromDB]);
 
-  // Load initial news based on first favorite topic
-  useEffect(() => {
-    if (preferences.favoriteTopics.length > 0 && !currentQuery) {
-      handleSearch(preferences.favoriteTopics[0]);
-    }
-  }, [preferences.favoriteTopics]);
-
   const handleSearch = useCallback(async (query: string) => {
+    if (!userId) {
+      setError('User not authenticated');
+      return;
+    }
+
     setCurrentQuery(query);
     setIsLoading(true);
     setError('');
@@ -86,7 +84,7 @@ export default function Dashboard({ preferences, onLogout, onUpdatePreferences }
     try {
       const response = await searchNews({
         query,
-        apiKey: preferences.apiKey,
+        userId,
         pageSize: 21,
       });
 
@@ -98,7 +96,15 @@ export default function Dashboard({ preferences, onLogout, onUpdatePreferences }
     } finally {
       setIsLoading(false);
     }
-  }, [preferences.apiKey]);
+  }, [userId]);
+
+  // Load initial news based on first favorite topic
+  useEffect(() => {
+    if (preferences.favoriteTopics.length > 0 && !currentQuery && userId) {
+      handleSearch(preferences.favoriteTopics[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preferences.favoriteTopics, userId]);
 
   // Article click tracking
   const handleArticleClick = async (articleUrl: string) => {

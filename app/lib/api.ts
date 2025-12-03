@@ -1,37 +1,37 @@
 import { NewsAPIResponse } from './types';
 
-const NEWS_API_BASE = 'https://newsapi.org/v2';
-
-export interface SearchParams {
+// Search params for server-side search (using userId)
+export interface SearchParamsWithUserId {
   query: string;
-  apiKey: string;
+  userId: string;
   pageSize?: number;
   page?: number;
   sortBy?: 'relevancy' | 'popularity' | 'publishedAt';
 }
 
+// Search news using the API route (server-side)
+// This fetches the user's API key from the database on the server
 export async function searchNews({
   query,
-  apiKey,
+  userId,
   pageSize = 20,
   page = 1,
   sortBy = 'publishedAt',
-}: SearchParams): Promise<NewsAPIResponse> {
+}: SearchParamsWithUserId): Promise<NewsAPIResponse> {
   const params = new URLSearchParams({
+    userId,
     q: query,
-    apiKey,
     pageSize: pageSize.toString(),
     page: page.toString(),
     sortBy,
-    language: 'en',
   });
 
   try {
-    const response = await fetch(`${NEWS_API_BASE}/everything?${params}`);
-    const data: NewsAPIResponse = await response.json();
+    const response = await fetch(`/api/news?${params}`);
+    const data = await response.json();
     
-    if (data.status === 'error') {
-      throw new Error(data.message || 'Failed to fetch news');
+    if (!response.ok || data.error) {
+      throw new Error(data.error || 'Failed to fetch news');
     }
     
     return data;
@@ -43,55 +43,19 @@ export async function searchNews({
   }
 }
 
-export async function getTopHeadlines({
-  apiKey,
-  category,
-  pageSize = 20,
-}: {
-  apiKey: string;
-  category?: string;
-  pageSize?: number;
-}): Promise<NewsAPIResponse> {
-  const params = new URLSearchParams({
-    apiKey,
-    pageSize: pageSize.toString(),
-    country: 'us',
-  });
-
-  if (category) {
-    params.append('category', category);
-  }
-
-  try {
-    const response = await fetch(`${NEWS_API_BASE}/top-headlines?${params}`);
-    const data: NewsAPIResponse = await response.json();
-    
-    if (data.status === 'error') {
-      throw new Error(data.message || 'Failed to fetch headlines');
-    }
-    
-    return data;
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('An unexpected error occurred');
-  }
-}
-
-// Validate API key by making a small request
+// Validate API key using the API route (server-side validation)
 export async function validateApiKey(apiKey: string): Promise<boolean> {
   try {
-    const params = new URLSearchParams({
-      apiKey,
-      q: 'test',
-      pageSize: '1',
+    const response = await fetch('/api/news', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ apiKey }),
     });
-
-    const response = await fetch(`${NEWS_API_BASE}/everything?${params}`);
-    const data: NewsAPIResponse = await response.json();
     
-    return data.status === 'ok';
+    const data = await response.json();
+    return data.valid === true;
   } catch {
     return false;
   }
@@ -124,4 +88,3 @@ export function formatDate(dateString: string): string {
     year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
   });
 }
-
