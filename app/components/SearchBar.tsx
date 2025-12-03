@@ -38,15 +38,16 @@ export default function SearchBar({ onSearch, favoriteTopics, currentQuery }: Se
 
   // Update local query when currentQuery prop changes (from topic buttons)
   useEffect(() => {
-    if (!isTyping) {
+    if (!isTyping && currentQuery !== query) {
       setQuery(currentQuery);
+      lastSearchRef.current = currentQuery;
     }
-  }, [currentQuery, isTyping]);
+  }, [currentQuery, isTyping, query]);
 
   // Trigger search when debounced query changes (only when typing)
   useEffect(() => {
-    if (isTyping && debouncedQuery.trim() && debouncedQuery !== lastSearchRef.current) {
-      lastSearchRef.current = debouncedQuery;
+    if (isTyping && debouncedQuery.trim() !== lastSearchRef.current) {
+      lastSearchRef.current = debouncedQuery.trim();
       onSearch(debouncedQuery.trim());
       setIsTyping(false);
     }
